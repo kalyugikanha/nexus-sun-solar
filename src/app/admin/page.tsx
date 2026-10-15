@@ -21,7 +21,12 @@ import {
   X,
   CreditCard,
   Save,
-  Zap
+  Zap,
+  Lock,
+  Key,
+  Eye,
+  EyeOff,
+  AlertCircle
 } from "lucide-react";
 import {
   Product,
@@ -48,6 +53,14 @@ import {
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "orders" | "settings" | "products">("dashboard");
+
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [pinInput, setPinInput] = useState<string>("");
+  const [pinError, setPinError] = useState<string>("");
+  const [showPin, setShowPin] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
 
   // State
   const [orders, setOrders] = useState<Order[]>([]);
@@ -108,6 +121,13 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    // Check if session is already authenticated
+    const storedAuth = typeof window !== "undefined" ? localStorage.getItem("suntech_admin_session") : null;
+    if (storedAuth === "active") {
+      setIsAuthenticated(true);
+    }
+    setAuthLoading(false);
+
     loadAllData();
 
     const handleUpdate = () => {
@@ -120,6 +140,35 @@ export default function AdminPage() {
       window.removeEventListener("storage", handleUpdate);
     };
   }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput.trim() === "admin123" || pinInput.trim() === "suntech2026") {
+      setIsAuthenticated(true);
+      setPinError("");
+      if (rememberMe) {
+        localStorage.setItem("suntech_admin_session", "active");
+      }
+      showToast("Access Granted: Welcome to Executive Command Center!");
+    } else {
+      setPinError("Invalid Passkey. Please enter the correct executive PIN (Default: admin123).");
+    }
+  };
+
+  const handleQuickUnlock = () => {
+    setPinInput("admin123");
+    setIsAuthenticated(true);
+    setPinError("");
+    localStorage.setItem("suntech_admin_session", "active");
+    showToast("Quick Demo Access: Welcome to Executive Command Center!");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("suntech_admin_session");
+    setIsAuthenticated(false);
+    setPinInput("");
+    showToast("Admin session safely locked.");
+  };
 
   // Compute live analytics
   const analytics = useMemo(() => computeAnalytics(orders), [orders]);
@@ -298,55 +347,194 @@ export default function AdminPage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4 text-white">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-slate-400 font-semibold tracking-wider uppercase">Loading SunTech Command...</p>
+      </div>
+    );
+  }
+
+  // Executive PIN Authentication Gate
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-[#1a3a5c]/40 to-slate-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-2xl border border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl relative overflow-hidden text-white">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/25 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center mx-auto mb-6 shadow-xl shadow-primary/30 border border-white/10">
+              <ShieldCheck className="w-8 h-8 text-white" />
+            </div>
+
+            <h2 className="text-2xl font-black tracking-tight text-white mb-2">
+              SunTech Executive Access
+            </h2>
+            <p className="text-xs text-slate-400 mb-8 leading-relaxed">
+              Restricted Administrative Command &amp; Operations Portal. Enter your administrator passkey to proceed.
+            </p>
+
+            {pinError && (
+              <div className="mb-6 p-3.5 bg-red-500/15 border border-red-500/30 rounded-2xl text-xs text-red-300 flex items-center gap-2.5 text-left animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{pinError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-5 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  Executive Passkey / PIN
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPin ? "text" : "password"}
+                    value={pinInput}
+                    onChange={(e) => {
+                      setPinInput(e.target.value);
+                      if (pinError) setPinError("");
+                    }}
+                    placeholder="Enter administrator passkey..."
+                    required
+                    autoFocus
+                    className="w-full pl-10 pr-11 py-3 bg-slate-950/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1 cursor-pointer"
+                  >
+                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-primary focus:ring-primary/30"
+                  />
+                  <span>Remember this session</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary-dark hover:to-primary text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary/25 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Key className="w-4 h-4" />
+                <span>Unlock Command Center</span>
+              </button>
+            </form>
+
+            {/* Quick Demo Access Button */}
+            <div className="mt-6 pt-6 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={handleQuickUnlock}
+                className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>🔑 Quick Demo Access (admin123)</span>
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <Link
+                href="/store"
+                className="text-xs text-slate-500 hover:text-slate-400 inline-flex items-center gap-1 transition-colors"
+              >
+                <span>&larr; Return to Public Store</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-slate-50 min-h-screen pb-20">
+    <div className="bg-slate-50 min-h-screen pb-24">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold animate-in fade-in">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold animate-in fade-in border border-slate-700">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Admin Top Header */}
-      <div className="bg-slate-900 text-white border-b border-slate-800 py-4 px-4 sm:px-8">
-        <div className="container-custom flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center font-bold text-white shadow-sm">
-              <ShieldCheck className="w-6 h-6" />
+      {/* Admin Top Header (Redesigned Executive Command Bar) */}
+      <div className="bg-gradient-to-r from-slate-950 via-[#1a3a5c] to-slate-950 text-white border-b border-slate-800/80 shadow-md relative z-30">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Brand & Live Status */}
+            <div className="flex items-center gap-3.5 sm:gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-primary/30 flex-shrink-0">
+                <ShieldCheck className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                  <h1 className="text-base sm:text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                    SunTech Executive Portal
+                  </h1>
+                  {/* Premium Live Operations Indicator */}
+                  <div className="inline-flex items-center gap-2.5 bg-emerald-950/70 border border-emerald-500/40 px-3.5 py-1.5 rounded-full text-xs shadow-inner backdrop-blur-md">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-sm shadow-emerald-400"></span>
+                    </span>
+                    <span className="text-[11px] font-black tracking-wider uppercase text-emerald-400">Live Operations</span>
+                    <span className="text-emerald-500/40 text-[10px]">•</span>
+                    <span className="text-[11px] text-emerald-300 font-mono font-medium hidden sm:inline">Active Cloud Sync</span>
+                    <span className="text-emerald-500/40 text-[10px] hidden sm:inline">•</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                      {orders.length} Active Orders
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  Order Bookings • Delivery Tracking • Part-Payment Reconciliation • Catalog Management
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-black tracking-wide flex items-center gap-2">
-                <span>SunTech Executive Portal</span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold uppercase px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  Live Operations
-                </span>
-              </h1>
-              <p className="text-xs text-slate-400">Order Booking, Delivery Tracking, Part-Payment &amp; Catalog Management</p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/store"
-              className="text-xs font-bold text-yellow-400 hover:text-yellow-300 bg-white/10 hover:bg-white/15 px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5"
-            >
-              <span>🛒 View Live Store</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+            {/* Actions: Live store link & Logout/Lock button */}
+            <div className="flex items-center gap-3 self-start lg:self-center flex-wrap">
+              <Link
+                href="/store"
+                className="text-xs font-bold text-yellow-300 hover:text-yellow-200 bg-white/10 hover:bg-white/15 border border-white/15 px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-xs"
+              >
+                <span>🛒 View Live Store</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Lock Portal Session"
+                className="text-xs font-bold text-rose-300 hover:text-white bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5 text-rose-400" />
+                <span>Lock Portal</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Admin Navigation Bar */}
-      <div className="bg-white border-b border-slate-200 sticky top-[72px] z-30 shadow-xs">
-        <div className="container-custom">
-          <div className="flex gap-2 sm:gap-6 overflow-x-auto py-2.5">
+      {/* Admin Navigation Bar (Sticky cleanly below root header) */}
+      <div className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-[72px] z-30 shadow-xs">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-2 sm:gap-3 overflow-x-auto py-3.5 no-scrollbar">
             <button
               onClick={() => setActiveTab("dashboard")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 cursor-pointer ${
                 activeTab === "dashboard"
-                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  ? "bg-primary text-white shadow-md shadow-primary/25"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
@@ -356,9 +544,9 @@ export default function AdminPage() {
 
             <button
               onClick={() => setActiveTab("orders")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 ${
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 cursor-pointer ${
                 activeTab === "orders"
-                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  ? "bg-primary text-white shadow-md shadow-primary/25"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
@@ -373,9 +561,9 @@ export default function AdminPage() {
 
             <button
               onClick={() => setActiveTab("settings")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 ${
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 cursor-pointer ${
                 activeTab === "settings"
-                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  ? "bg-primary text-white shadow-md shadow-primary/25"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
@@ -385,9 +573,9 @@ export default function AdminPage() {
 
             <button
               onClick={() => setActiveTab("products")}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 ${
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all flex-shrink-0 cursor-pointer ${
                 activeTab === "products"
-                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  ? "bg-primary text-white shadow-md shadow-primary/25"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
@@ -398,7 +586,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="container-custom pt-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         {/* ============================================================== */}
         {/* TAB 1: DASHBOARD & ANALYTICS */}
         {/* ============================================================== */}
@@ -699,32 +887,32 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
+              <div className="overflow-x-auto -mx-6 sm:mx-0">
+                <table className="w-full min-w-[760px] text-xs text-left">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
-                      <th className="py-3 px-4 rounded-l-xl">Order ID</th>
-                      <th className="py-3 px-4">Customer</th>
-                      <th className="py-3 px-4">Items</th>
-                      <th className="py-3 px-4">Payment</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 rounded-r-xl text-right">Action</th>
+                      <th className="py-3.5 px-5 rounded-l-xl whitespace-nowrap">Order ID</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Customer</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Items</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Payment</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Status</th>
+                      <th className="py-3.5 px-5 rounded-r-xl text-right whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {orders.slice(0, 5).map((ord) => (
                       <tr key={ord.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{ord.id}</td>
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5 font-mono font-bold text-slate-900 whitespace-nowrap">{ord.id}</td>
+                        <td className="py-4 px-5 whitespace-nowrap">
                           <span className="font-semibold text-slate-900 block">{ord.customer.fullName}</span>
                           <span className="text-slate-400 text-[11px]">{ord.customer.city}</span>
                         </td>
-                        <td className="py-3 px-4 text-slate-600">
+                        <td className="py-4 px-5 text-slate-600">
                           {ord.items.length} item{ord.items.length > 1 ? "s" : ""} (₹{ord.total})
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5 whitespace-nowrap">
                           <span
-                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
                               ord.paymentMethod === "part_payment"
                                 ? "bg-amber-100 text-amber-800"
                                 : ord.paymentMethod === "prepaid"
@@ -735,9 +923,9 @@ export default function AdminPage() {
                             {ord.paymentMethod.replace(/_/g, " ")}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5 whitespace-nowrap">
                           <span
-                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                            className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md ${
                               ord.status === "delivered"
                                 ? "bg-emerald-100 text-emerald-800"
                                 : ord.status === "out_for_delivery"
@@ -750,7 +938,7 @@ export default function AdminPage() {
                             {ord.status.replace(/_/g, " ")}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-4 px-5 text-right whitespace-nowrap">
                           <button
                             onClick={() => openOrderModal(ord)}
                             className="text-primary hover:underline font-bold text-xs"
@@ -824,21 +1012,21 @@ export default function AdminPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
+                <table className="w-full min-w-[980px] text-xs text-left">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
-                      <th className="py-3 px-4">Order ID &amp; Date</th>
-                      <th className="py-3 px-4">Customer</th>
-                      <th className="py-3 px-4">Equipment Ordered</th>
-                      <th className="py-3 px-4">Payment Breakdown</th>
-                      <th className="py-3 px-4">Status &amp; Delivery</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Order ID &amp; Date</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Customer</th>
+                      <th className="py-3.5 px-5">Equipment Ordered</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Payment Breakdown</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Status &amp; Delivery</th>
+                      <th className="py-3.5 px-5 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-10 text-slate-400">
+                        <td colSpan={6} className="text-center py-12 text-slate-400">
                           No orders match the specified filter criteria.
                         </td>
                       </tr>
@@ -846,7 +1034,7 @@ export default function AdminPage() {
                       filteredOrders.map((ord) => (
                         <tr key={ord.id} className="hover:bg-slate-50/70 transition-colors">
                           {/* Order ID */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5 whitespace-nowrap">
                             <span className="font-mono font-bold text-slate-900 block">{ord.id}</span>
                             <span className="text-[11px] text-slate-400">
                               {new Date(ord.createdAt).toLocaleDateString("en-IN", {
@@ -859,21 +1047,21 @@ export default function AdminPage() {
                           </td>
 
                           {/* Customer */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5 whitespace-nowrap">
                             <span className="font-bold text-slate-900 block">{ord.customer.fullName}</span>
                             <span className="text-slate-500 text-[11px] block">{ord.customer.phone}</span>
                             <span className="text-slate-400 text-[11px]">{ord.customer.city}, {ord.customer.pincode}</span>
                           </td>
 
                           {/* Equipment */}
-                          <td className="py-3.5 px-4 max-w-xs">
-                            <p className="font-medium text-slate-800 line-clamp-2">
+                          <td className="py-4 px-5 max-w-xs">
+                            <p className="font-medium text-slate-800 line-clamp-2 leading-relaxed">
                               {ord.items.map((i) => `${i.productName} (${i.quantity}x)`).join(", ")}
                             </p>
                           </td>
 
                           {/* Payment */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5 whitespace-nowrap">
                             <div className="font-bold text-slate-900">₹{ord.total} Total</div>
                             {ord.paymentMethod === "part_payment" ? (
                               <div className="text-[11px] mt-0.5">
@@ -888,7 +1076,7 @@ export default function AdminPage() {
                           </td>
 
                           {/* Status */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5 whitespace-nowrap">
                             <span
                               className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md inline-block mb-1 ${
                                 ord.status === "delivered"
@@ -912,10 +1100,10 @@ export default function AdminPage() {
                           </td>
 
                           {/* Action */}
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-4 px-5 text-right whitespace-nowrap">
                             <button
                               onClick={() => openOrderModal(ord)}
-                              className="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors font-bold text-xs"
+                              className="px-3.5 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition-colors font-bold text-xs shadow-xs"
                             >
                               Edit &amp; Track
                             </button>
@@ -1100,21 +1288,21 @@ export default function AdminPage() {
             {/* Products Table */}
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
+                <table className="w-full min-w-[860px] text-xs text-left">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
-                      <th className="py-3 px-4">Product</th>
-                      <th className="py-3 px-4">Category</th>
-                      <th className="py-3 px-4">Price / MRP</th>
-                      <th className="py-3 px-4">Stock Status</th>
-                      <th className="py-3 px-4">Rating</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Product</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Category</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Price / MRP</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Stock Status</th>
+                      <th className="py-3.5 px-5 whitespace-nowrap">Rating</th>
+                      <th className="py-3.5 px-5 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {products.map((prod) => (
                       <tr key={prod.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3.5 px-4 flex items-center gap-3">
+                        <td className="py-4 px-5 flex items-center gap-3.5">
                           <div className="w-12 h-12 rounded-xl bg-slate-50 p-1 border border-slate-200 flex-shrink-0 flex items-center justify-center">
                             <img src={prod.image} alt={prod.name} className="w-full h-full object-contain" />
                           </div>
@@ -1124,43 +1312,43 @@ export default function AdminPage() {
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-slate-600 font-medium">
+                        <td className="py-4 px-5 text-slate-600 font-medium whitespace-nowrap">
                           {prod.categoryName}
                         </td>
 
-                        <td className="py-3.5 px-4">
+                        <td className="py-4 px-5 whitespace-nowrap">
                           <span className="font-black text-slate-900">₹{prod.price}</span>
                           <span className="text-slate-400 line-through text-[11px] block">₹{prod.mrp}</span>
                         </td>
 
-                        <td className="py-3.5 px-4">
+                        <td className="py-4 px-5 whitespace-nowrap">
                           {prod.inStock ? (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                               In Stock ({prod.stockCount})
                             </span>
                           ) : (
-                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
                               Out of Stock
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3.5 px-4 font-bold text-slate-800">
+                        <td className="py-4 px-5 font-bold text-slate-800 whitespace-nowrap">
                           ⭐ {prod.rating} ({prod.reviewCount})
                         </td>
 
-                        <td className="py-3.5 px-4 text-right">
+                        <td className="py-4 px-5 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => openEditProductModal(prod)}
-                              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors"
+                              className="p-2 text-slate-500 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                               title="Edit product"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                               title="Delete product"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1182,7 +1370,7 @@ export default function AdminPage() {
       {/* ============================================================== */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
               <div>
                 <span className="text-xs font-mono font-bold text-primary">{selectedOrder.id}</span>
